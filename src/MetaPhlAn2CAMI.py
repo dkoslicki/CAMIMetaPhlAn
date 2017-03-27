@@ -21,7 +21,7 @@ def read_params(args):
          help="Input Metaphlan.tsv file")
     arg('--output', metavar='output_file', required=True, default=None, type=str,
          help="Output file (you should have this end in .profile)")
-    arg( '--taxonomy', metavar='taxonomy_file', required=True, default=None, type=str,
+    arg('--taxonomy', metavar='taxonomy_file', required=True, default=None, type=str,
          help="Taxonomy file from generate_taxonomy_taxid.py (after removing norank and noname, see README)")
     return vars(parser.parse_args())
 
@@ -31,11 +31,12 @@ def convert(metaphlan_file, output_file, taxonomy_file):
     input_abundance = []
     fid = open(metaphlan_file, 'r')
     for line in fid:
-        line = line.strip().split()
-        tax_path = line[0]
-        abundance = float(line[1])
-        input_taxonomy.append(tax_path.split('|')[-1])
-        input_abundance.append(abundance)
+        if line[0] != '#':
+            line = line.strip().split()
+            tax_path = line[0]
+            abundance = float(line[1])
+            input_taxonomy.append(tax_path.split('|')[-1])
+            input_abundance.append(abundance)
 
     fid.close()
 
