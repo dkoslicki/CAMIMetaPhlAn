@@ -9,9 +9,9 @@ __author__ = 'David Koslicki (dmkoslicki@gmail.com, david.koslicki@math.oregonst
 __version__ = '1.0.0'
 __date__ = '27 Mar 2017'
 
-metaphlan_file = '/home/dkoslicki/Dropbox/Repositories/CAMIMetaPhlAn/test.tsv'
-taxonomy_file = '/home/dkoslicki/Dropbox/Repositories/CAMIMetaPhlAn/taxonomy_reduced_taxID_27032017.txt'
-output_file = '/home/dkoslicki/Dropbox/Repositories/CAMIMetaPhlAn/test.profile'
+#metaphlan_file = '/home/dkoslicki/Dropbox/Repositories/CAMIMetaPhlAn/test.tsv'
+#taxonomy_file = '/home/dkoslicki/Dropbox/Repositories/CAMIMetaPhlAn/taxonomy_reduced_taxID_27032017.txt'
+#output_file = '/home/dkoslicki/Dropbox/Repositories/CAMIMetaPhlAn/test.profile'
 
 def read_params(args):
     parser = argparse.ArgumentParser(description='')
@@ -33,10 +33,19 @@ def convert(metaphlan_file, output_file, taxonomy_file):
     for line in fid:
         if line[0] != '#':
             line = line.strip().split()
-            tax_path = line[0]
+            tax_path = line[0]  # MetaPhlAn2 only gives the names, so use these (they have <rank>__ prepended)
             abundance = float(line[1])
-            input_taxonomy.append(tax_path.split('|')[-1])
-            input_abundance.append(abundance)
+            tax_path_split = tax_path.split('|')
+            # Don't include terminating repeat tax_paths
+            if len(tax_path_split) > 1:
+                if '_'.join(tax_path_split[-1].split('_')[2:]) == '_'.join(tax_path_split[-2].split('_')[2:]):
+                    continue
+                else:
+                    input_taxonomy.append(tax_path_split[-1])  # Add the terminal dude
+                    input_abundance.append(abundance)  # Also include the associated abundance
+            else:
+                input_taxonomy.append(tax_path_split[-1])
+                input_abundance.append(abundance)
 
     fid.close()
 
@@ -47,17 +56,24 @@ def convert(metaphlan_file, output_file, taxonomy_file):
     for line in fid:
         line = line.strip().split()
         entry = dict()
-        #i += 1
-        #if i > 1000:
-        #    break
-        #name = '_'.join(line[0].split('_')[1:])
         tax_id = line[1]
         full_tax_path = line[2]
-        name = full_tax_path.split('|')[-1].split('_')
-        name.pop(2)
-        name = '_'.join(name)
-        tax_id_path = '|'.join([item.split('_')[2] for item in full_tax_path.split('|')])
-        tax_path_sn = '|'.join(['_'.join(item.split('_')[3:]) for item in full_tax_path.split('|')])
+        name = full_tax_path.split('|')[-1].split('_')  # get full name
+        name.pop(2)  # drop off the taxID identifier
+        name = '_'.join(name)  # re-join it up
+        #tax_id_path = '|'.join([item.split('_')[2] for item in full_tax_path.split('|')])  # get the taxIDs in order
+        # tax_path_sn = '|'.join(['_'.join(item.split('_')[3:]) for item in full_tax_path.split('|')])  # get the names in order
+        tax_id_path_list = [item.split('_')[2] for item in full_tax_path.split('|')]  # get the taxIDs in order
+        tax_path_sn_list = ['_'.join(item.split('_')[3:]) for item in full_tax_path.split('|')]
+        seen_list = set()
+        for i in range(len(tax_id_path_list)):
+            if tax_id_path_list[i] in seen_list:
+                tax_id_path_list[i] = ''
+                tax_path_sn_list[i] = ''
+            else:
+                seen_list.add(tax_id_path_list[i])
+        tax_id_path = '|'.join(tax_id_path_list)
+        tax_path_sn = '|'.join(tax_path_sn_list)
         entry['tax_id'] = tax_id
         entry['tax_id_path'] = tax_id_path
         entry['tax_path_sn'] = tax_path_sn
@@ -85,6 +101,7 @@ def convert(metaphlan_file, output_file, taxonomy_file):
     for line_num in xrange(len(input_taxonomy)):
         name = input_taxonomy[line_num]
         if name in reference_taxonomy:
+            # Need to carefully get rid of repeated taxids
             entry = reference_taxonomy[name]
             tax_id = entry['tax_id']
             rank = letter_to_rank[name.split('_')[0]]
